@@ -1,0 +1,393 @@
+import random
+from time import sleep
+
+class Player:
+    def __init__(self, name, hp, armor):
+        self.name = name
+        self.hp = hp
+        self.max_hp = hp
+        self.armor = armor
+        self.weapons = {"firearm": None, "melee": None, "grenade": Grenade()}
+        self.grenade_count = 1
+
+    def take_damage(self, damage):
+        if self.armor > damage:
+            self.armor -= damage
+        else:
+            self.hp -= (damage - self.armor)
+            self.armor = 0
+
+    def heal(self, amount):
+        self.hp += amount
+        if self.hp > self.max_hp:
+            self.hp = self.max_hp
+
+    def choose_weapon(self, weapon_type, weapon):
+        if weapon_type in self.weapons.keys() and weapon:
+            if weapon_type == "firearm":
+                firearm_weapon = any(isinstance(w, Weapon) and w.damage_type == "fire" for w in self.weapons.values())
+                if firearm_weapon:
+                    print(color.out_red("У вас уже есть одно огнестрельное оружие."))
+                    return
+            self.weapons[weapon_type] = weapon
+            print(color.out_yellow(f"Вы получили оружие: {weapon.name}"))
+        else:
+            print("Вы не можете выбрать данное оружие.")
+
+    def select_attack_weapon(self):
+        print(color.out_green("Выберите оружие для атаки:"))
+        for weapon_type, weapon in self.weapons.items():
+            if weapon:
+                print(f"{weapon_type.capitalize()}: {weapon.name}")
+
+        while True:
+            weapon_choice = input("Введите тип оружия для атаки: ")
+            if weapon_choice.lower() in self.weapons.keys():
+
+                selected_weapon = self.weapons[weapon_choice.lower()]
+
+                if selected_weapon:
+                    return selected_weapon
+                else:
+                    print("Вы не выбрали данное оружие или оно отсутствует.")
+            else:
+                print(color.out_red("Вы ввели некорректный тип оружия. Попробуйте еще раз."))
+
+    def attack(self, enemy):
+        current_weapon = self.select_attack_weapon()
+        if isinstance(current_weapon, Grenade):
+            if current_weapon.use_ammo():
+                current_weapon.throw(self, enemy)
+        else:
+            current_weapon.attack(self, enemy)
+    def print_inventory(self):
+        print(color.out_yellow("Инвентарь:"))
+        for weapon_type, weapon in self.weapons.items():
+            if weapon:
+                print(color.out_yellow(f"Оружие({weapon_type.capitalize()}): {weapon.name}"))
+                if isinstance(weapon, Rifle) or isinstance(weapon, M4Rifle) or isinstance(weapon, DesertEagle):
+                    print(color.out_blue(f"Патроны: {weapon.ammo}"))
+        print(color.out_blue(f"Гранаты: {self.grenade_count}"))
+class Color:
+    @staticmethod
+    def out_red(text):
+        return "\033[31m" + text + "\033[0m"
+
+    @staticmethod
+    def out_yellow(text):
+        return "\033[33m" + text + "\033[0m"
+
+    @staticmethod
+    def out_blue(text):
+        return "\033[34m" + text + "\033[0m"
+
+    @staticmethod
+    def out_green(text):
+        return "\033[32m" + text + "\033[0m"
+
+
+class Weapon:
+    def __init__(self, name, damage, accuracy, damage_type):
+        self.name = name
+        self.damage = damage
+        self.accuracy = accuracy
+        self.damage_type = damage_type
+
+    def attack(self, player, enemy):
+        if random.random() < self.accuracy:
+            enemy.take_damage(self.damage)
+            print(f"{player.name} атакует {enemy.name} с помощью {self.name} и наносит {self.damage} урона.")
+        else:
+            print(f"{player.name} промахивается при атаке с помощью {self.name}.")
+
+    def throw(self, player, enemy):
+        enemy.take_damage(self.damage)
+        print(f"{player.name} бросает {self.name} в {enemy.name} и наносит {self.damage} урона.")
+
+class Rifle(Weapon):
+    def __init__(self):
+        super().__init__("Винтовка", 45, 0.9, "fire")
+        self.ammo = 5
+
+
+class M4Rifle(Weapon):
+    def __init__(self):
+        super().__init__("M4 автоматическая винтовка", 15, 0.5, "fire")
+        self.ammo = 30
+
+    def attack(self, player, enemy):
+        bullets = min(self.ammo, 5)
+        for _ in range(bullets):
+            if random.random() < self.accuracy:
+                enemy.take_damage(self.damage)
+                print(f"{player.name} атакует {enemy.name} с помощью {self.name} и наносит {self.damage} урона.")
+        self.ammo -= bullets
+
+
+class DesertEagle(Weapon):
+    def __init__(self):
+        super().__init__("Desert Eagle", 65, 0.2, "melee")
+        self.ammo = 9
+
+
+class Machete(Weapon):
+    def __init__(self):
+        super().__init__("Мачета", 17, 0.85, "melee")
+
+
+class IronPipe(Weapon):
+    def __init__(self):
+        super().__init__("Железная труба", 7, 0.75, "melee")
+
+
+class Grenade(Weapon):
+    def __init__(self):
+        super().__init__("Обычная граната", 90, 1, "explosion")
+        self.ammo = 1
+
+    def use_ammo(self):
+        if self.ammo > 0:
+            self.ammo -= 1
+            return True
+        else:
+            print("У вас закончились гранаты.")
+            return False
+
+class Flashbang(Weapon):
+    def __init__(self):
+        super().__init__("Флешка", 20, 1, "explosion")
+
+#смок и флешка должны были оглушать и давать скрыться, но не успел просто реализовать это, поэтому пусть будут наносить одинаковый урон хотя-бы.
+class Smoke(Weapon):
+    def __init__(self):
+        super().__init__("Смок", 20, 1, "explosion")
+
+
+class Enemy:
+    def __init__(self, name, hp, damage_range):
+        self.name = name
+        self.hp = hp
+        self.damage_range = damage_range
+
+    def take_damage(self, damage):
+        self.hp -= damage
+
+    def attack(self, player):
+        damage = random.randint(*self.damage_range)
+        player.take_damage(damage)
+        print(f"{self.name} атакует {player.name} и наносит {damage} урона.")
+
+
+class Station:
+    def __init__(self, player):
+        self.player = player
+
+    def generate_station_type(self):
+        station_types = ["battle", "trader", "abandoned"]
+        probabilities = [0.7, 0.15, 0.15]
+        station_count = 3
+        station_type_list = []
+
+        while len(station_type_list) < station_count:
+            station_type = random.choices(station_types, probabilities)[0]
+            if station_type not in station_type_list:
+                station_type_list.append(station_type)
+
+        return station_type_list
+
+    def explore_station(self, station_types, explored_stations):
+        print("Вы решаете исследовать станцию...")
+
+        if len(explored_stations) == len(station_types):
+            print("Все станции уже были исследованы.")
+            return
+
+        station_index = len(explored_stations)
+        station_type = station_types[station_index]
+
+        if station_type == "battle":
+            enemy = self.generate_enemy()
+            print(color.out_red(f"На вашем пути встретился {enemy.name}!"))
+            print(color.out_blue(f"Будьте бдительны, возможно этот монстр не так прост, как вам кажется."))
+            self.battle(enemy)
+        elif station_type == "trader":
+            print(color.out_blue("Вы обнаружили локацию торговцев!"))
+            self.trader_interaction()
+        elif station_type == "abandoned":
+            print(color.out_yellow("Вы обнаружили заброшенную станцию!"))
+            self.abandoned_location_interaction()
+
+        explored_stations.append(station_type)
+
+    def trade_location(self):
+        print("Вы посетили торговую локацию!")
+        ammo = self.player.weapons.get("firearm").ammo if self.player.weapons.get("firearm") is not None else 0
+        print("На что вы хотите поменять патроны? У вас есть:")
+        print(color.out_blue(f"Патроны: {ammo}"))
+        print("1. Граната (5 патронов)")
+        print("2. Ничего")
+        trade_choice = input("Выберите действие: ")
+        if trade_choice == "1" and ammo >= 5:
+            self.player.grenade_count += 1
+            self.player.weapons["firearm"].ammo -= 5
+            print("Вы получили гранату!")
+        elif trade_choice == "2":
+            print("Вы ничего не поменяли.")
+        else:
+            print(color.out_red("У вас недостаточно патронов для обмена на гранату."))
+
+    def enter_station(self):
+        print(f"Добро пожаловать на станцию, {self.player.name}!")
+        self.player.heal(65)
+        self.choose_weapon()
+        station_types = self.generate_station_type()
+        explored_stations = []
+
+        while True:
+            print("1. Исследовать станцию")
+            print("2. Вернуться на станцию")
+            print("3. Выйти из игры")
+            choice = input("Выберите действие: ")
+
+            if choice == "1":
+                self.explore_station(station_types, explored_stations)
+            elif choice == "2":
+                self.player.heal(25)
+                print("Вы вернулись на станцию.")
+                self.player.print_inventory()
+            elif choice == "3":
+                print(color.out_red(
+                    '\n\n\n-----------------------------------GAME OVER----------------------------------\n\n\n\nGame created by (с)Maxim Tkhir\nContact - https://github.com/MaximTkhir\n\n'))
+                sleep(2)
+                exit()
+
+    def choose_weapon(self):
+        firearm_choices = {"1": Rifle(), "2": M4Rifle(), "3": DesertEagle()}
+        melee_choices = {"4": Machete(), "5": IronPipe()}
+        grenade_choices = {"6": Grenade(), "7": Flashbang(), "8": Smoke()}
+        print("Выберите оружие:")
+        for num, weapon in firearm_choices.items():
+            print(f"{num}. {weapon.name}")
+        chosen_firearm = input("Выберите огнестрельное оружие (Введите номер): ")
+        if chosen_firearm in firearm_choices.keys():
+            self.player.choose_weapon("firearm", firearm_choices[chosen_firearm])
+            print("\n")
+        print("Выберите оружие ближнего боя:")
+        for num, weapon in melee_choices.items():
+            print(f"{num}. {weapon.name}")
+        chosen_melee = input("Выберите оружие ближнего боя (Введите номер): ")
+        if chosen_melee in melee_choices.keys():
+            self.player.choose_weapon("melee", melee_choices[chosen_melee])
+            print("\n")
+        print("Выберите гранату:")
+        for num, weapon in grenade_choices.items():
+            print(f"{num}. {weapon.name}")
+        chosen_grenade = input("Выберите гранату (Введите номер): ")
+        if chosen_grenade in grenade_choices.keys():
+            self.player.choose_weapon("grenade", grenade_choices[chosen_grenade])
+
+
+    def trader_interaction(self):
+        print(color.out_blue("Добро пожаловать к торговцам!"))
+        print("У них вы можете обменять патроны на гранаты или аптечку.")
+        print(f"У вас сейчас: {self.player.grenade_count} гранат и {self.player.hp} здоровья.")
+        bullets_count = self.player.weapons["firearm"].ammo if self.player.weapons.get("firearm") is not None else 0
+
+        if bullets_count >= 2:
+            print(color.out_blue("1. Обменять 2 патрона на аптечку"))
+        if bullets_count >= 3:
+            print(color.out_blue("2. Обменять 3 патрона на гранату"))
+
+        trade_choice = input("Выберите действие (Введите номер): ")
+
+        if trade_choice == "1" and bullets_count >= 2:
+            self.player.hp += 25
+            self.player.weapons["firearm"].ammo -= 2
+            print(color.out_yellow("Вы обменяли 2 патрона на аптечку. Ваши жизни восстановлены."))
+        elif trade_choice == "2" and bullets_count >= 3:
+            self.player.grenade_count += 1
+            self.player.weapons["firearm"].ammo -= 3
+            print(color.out_yellow("Вы обменяли 3 патрона на гранату."))
+        else:
+            print(color.out_red("У вас недостаточно патронов для обмена."))
+
+    def abandoned_location_interaction(self):
+        print(color.out_yellow("Вы нашли заброшенную локацию!"))
+        ammo_chance = 0.35
+        armor_chance = 0.35
+        grenade_chance = 0.3
+        ammo_count = random.randint(1, 20) if random.random() < ammo_chance else 0
+
+        if ammo_count > 0:
+            print(color.out_yellow(f"Вы нашли {ammo_count} патронов."))
+
+        if random.random() < armor_chance:
+            self.player.armor += 100
+            print(color.out_yellow("Вы нашли броню. Ваша броня пополнена на 100 единиц."))
+
+        if random.random() < grenade_chance:
+            chosen_grenade = self.player.weapons.get("grenade")
+            if chosen_grenade:
+                grenade_count = random.randint(1, 3)
+                self.player.weapons["grenade"].ammo += grenade_count
+                print(color.out_yellow(f"Вы нашли {grenade_count} {chosen_grenade.name}."))
+            else:
+                print("Вы не выбрали гранату в начале игры.")
+
+    def generate_enemy(self):
+        enemies = [
+            Enemy("Кикимора", 50, (5, 10)),
+            Enemy("Биомаса", 20, (15, 25)),
+            Enemy("Упырь", 50, (20, 30)),
+            Enemy("Страж", 70, (25, 40)),
+            Enemy("Чёрный Библиотекарь", 100, (30, 50))
+        ]
+        return random.choice(enemies)
+
+    def battle(self, enemy):
+        print("Битва началась!")
+        while self.player.hp > 0 and enemy.hp > 0:
+            print(color.out_blue(f"Ваше здоровье: {self.player.hp} Броня: {self.player.armor}"))
+            print(color.out_red(f"Здоровье {enemy.name}: {enemy.hp}"))
+            self.player.attack(enemy)
+
+            if enemy.hp > 0:
+                enemy.attack(self.player)
+            self.player.print_inventory()
+            print()
+        if self.player.hp > 0:
+            print(color.out_green(f"Вы победили монстра {enemy.name}!"))
+        else:
+            print(color.out_red(f"{enemy.name} победил вас!"))
+        self.player.heal(25)
+
+if __name__ == "__main__":
+    color = Color()
+    print("Загрузка...")
+    sleep(1)
+    print("Загрузка завершена.\n")
+    print(color.out_green("Добро пожаловать в игру по произведению Метро 2033!"))
+    sleep(2)
+    print(color.out_red("На данный момент в игре много чего не реализовано из-за отсутствия времени и маленьких сроков для такого жанра"))
+    print(color.out_red("Вы можете увидеть множество не реализованного кода, это связано с тем, что хотел добавить много разных механик, но не успел. "))
+    print(color.out_red("Сейчас в игре реализованы такие механики как -"
+                        "3 Локации, 5 монстров, 3 вида огнестрельного оружия, у которого разная механика, 2 оружия ближнего боя, у которых механика не сделана в принципе, это должно было быть оглушение и кровотечение, а так-же 3 гранаты, из которых лишь обычная граната имеет механику, флешка и смок должны были помогать продержаться больше станций/волн."))
+    sleep(10)
+    print(color.out_blue("Благодарю за внимание и надеюсь, что многие поймут меня в данной ситуации. Как и мой преподаватель."))
+    print(color.out_red("Игра разработана (c)Maxim Tkhir\n\n"))
+    sleep(1)
+    print("Загрузка...")
+    sleep(2)
+    print("Загрузка завершена.\n")
+    confirmation = input(color.out_red("Вы готовы вступить в бой с неизвестным и начать игру? (Да/Нет): "))
+    if confirmation.lower() in ["да", "yes"]:
+        sleep(1)
+        print("\n\n")
+        print(color.out_green("---------------------------------------------Game Start-------------------------------------------\n\n\n"))
+        print(color.out_green("\nПриветствую тебя путник!"))
+        name = input(color.out_green("Как я могу к тебе обращаться?: "))
+        player = Player(name, 100, 50)
+        station = Station(player)
+        station.enter_station()
+    else:
+        print(color.out_red("Возможно, вы совершили ошибку или не подтвердили начало игры."))
